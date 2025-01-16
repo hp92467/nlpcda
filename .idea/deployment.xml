@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" autoUpload="Always" remoteFilesAllowedToDisappearOnAutoupload="false" showAutoUploadSettingsWarning="false">
+    <serverData>
+      <paths name="wyb@113.54.151.216:1027 password (yes)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/wyb/hp/pycharm_projects" local="$PROJECT_DIR$/.." />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="wyb@121.48.164.89:1027 password">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/wyb/hp/pycharm_projects/nlpcda" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+    <option name="myAutoUpload" value="ALWAYS" />
+  </component>
+</project>
