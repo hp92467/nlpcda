@@ -27,35 +27,52 @@ app = FastAPI()
 @app.post("/")
 async def create_item(request: Request):
     global model, tokenizer  # 声明全局变量以便在函数内部使用模型和分词器
-    json_post_raw = await request.json()  # 获取POST请求的JSON数据
-    json_post = json.dumps(json_post_raw)  # 将JSON数据转换为字符串
-    json_post_list = json.loads(json_post)  # 将字符串转换为Python对象
-    prompt = json_post_list.get('prompt')  # 获取请求中的提示
-    max_length = json_post_list.get('max_length')  # 获取请求中的最大长度
+    try:
+        json_post_raw = await request.json()  # 获取POST请求的JSON数据
+        json_post = json.dumps(json_post_raw)  # 将JSON数据转换为字符串
+        json_post_list = json.loads(json_post)  # 将字符串转换为Python对象
+        prompt = json_post_list.get('prompt')  # 获取请求中的提示
+        max_length = json_post_list.get('max_length', 512)  # 获取请求中的最大长度，默认512
 
-    # 构建 messages
-    messages = [
-        {"role": "user", "content": prompt}
-    ]
-    # 构建输入
-    input_tensor = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt")
-    # 通过模型获得输出
-    outputs = model.generate(input_tensor.to(model.device), max_new_tokens=max_length)
-    result = tokenizer.decode(outputs[0][input_tensor.shape[1]:], skip_special_tokens=True)
+        # 构建 messages
+        messages = json_post_list.get('messages', [{"role": "user", "content": prompt}])
+        # 构建输入
+        if hasattr(tokenizer, 'apply_chat_template'):
+            input_tensor = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt")
+        else:
+            input_tensor = tokenizer.encode(prompt, return_tensors="pt")
+        # 通过模型获得输出
+        generation_config = {
+            "max_new_tokens": max_length,
+            "temperature": json_post_list.get('temperature', 0.7),
+            "top_p": json_post_list.get('top_p', 0.9),
+            "do_sample": True
+        }
+        outputs = model.generate(input_tensor.to(model.device), **generation_config)
+        result = tokenizer.decode(outputs[0][input_tensor.shape[1]:], skip_special_tokens=True)
 
-    now = datetime.datetime.now()  # 获取当前时间
-    time = now.strftime("%Y-%m-%d %H:%M:%S")  # 格式化时间为字符串
-    # 构建响应JSON
-    answer = {
-        "response": result,
-        "status": 200,
-        "time": time
-    }
-    # 构建日志信息
-    log = "[" + time + "] " + '", prompt:"' + prompt + '", response:"' + repr(result) + '"'
-    print(log)  # 打印日志
-    torch_gc()  # 执行GPU内存清理
-    return answer  # 返回响应
+        now = datetime.datetime.now()  # 获取当前时间
+        time = now.strftime("%Y-%m-%d %H:%M:%S")  # 格式化时间为字符串
+        # 构建响应JSON
+        answer = {
+            "response": result,
+            "status": 200,
+            "time": time
+        }
+        # 构建日志信息
+        log = "[" + time + "] " + '", prompt:"' + prompt[:100] + '", response:"' + repr(result)[:100] + '"'
+        print(log)  # 打印日志
+        torch_gc()  # 执行GPU内存清理
+        return answer  # 返回响应
+    except Exception as e:
+        now = datetime.datetime.now()
+        time = now.strftime("%Y-%m-%d %H:%M:%S")
+        answer = {
+            "response": f"请求处理失败: {str(e)}",
+            "status": 500,
+            "time": time
+        }
+        return answer
 
 
 # 主函数入口
