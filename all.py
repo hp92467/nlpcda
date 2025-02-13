@@ -188,7 +188,7 @@ class IntegratedSystem:
             query_text: 用户输入的查询文本
             top_k: 返回的最相似规则数量
         Returns:
-            response: DeepSeek的回答
+            response: 回答
         """
         try:
             # 1. 使用QueryMatchingSystem检索相关规则
@@ -212,7 +212,7 @@ def main():
     while True:
         try:
             # 获取用户输入
-            query = input("\n请输入查询内容: ").strip()
+            query = input("\n请描述特征量的异常情况: ").strip()
 
             if query.lower() == 'quit':
                 print("退出系统")
@@ -226,7 +226,7 @@ def main():
             response = system.process_user_query(query)
 
             # 打印结果
-            print("\nDeepSeek的回答:")
+            print("\n回答:")
             print("-" * 50)
             print(response)
             print("-" * 50)
