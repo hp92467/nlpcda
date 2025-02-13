@@ -10,11 +10,6 @@ import numpy as np
 from sentence_transformers import LoggingHandler, SentenceTransformer
 import numpy as np
 
-
-
-
-
-
 #### Just some code to print debug information to stdout
 np.set_printoptions(threshold=100)
 
