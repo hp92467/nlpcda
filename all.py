@@ -3,6 +3,7 @@ import faiss
 import json
 from sentence_transformers import SentenceTransformer
 import logging
+import requests
 
 
 class QueryMatchingSystem:
@@ -106,14 +107,110 @@ class QueryMatchingSystem:
         )
 
 
+class ChatBot:
+    def __init__(self, api_url='http://127.0.0.1:6006', timeout=100):
+        self.api_url = api_url
+        self.timeout = timeout
+        self.conversation_history = []
+
+    def add_to_history(self, role, content):
+        """Add a message to conversation history"""
+        self.conversation_history.append({
+            "role": role,
+            "content": content
+        })
+
+    def get_completion(self, user_input):
+        """Send request to the model with conversation history"""
+        self.add_to_history("user", user_input)
+
+        headers = {'Content-Type': 'application/json'}
+        # 简化请求数据结构
+        data = {
+            "prompt": user_input,  # 直接发送当前输入
+            "max_tokens": 200,
+            "temperature": 0.7
+        }
+
+        try:
+            response = requests.post(
+                url=self.api_url,
+                headers=headers,
+                data=json.dumps(data),
+                timeout=self.timeout
+            )
+            response.raise_for_status()
+
+            # 检查响应是否为JSON格式
+            try:
+                result = response.json()
+            except json.JSONDecodeError:
+                return f"API返回了非JSON格式的响应: {response.text[:100]}"
+
+            # 检查响应中是否包含预期的字段
+            if isinstance(result, dict):
+                model_response = result.get('response')
+                if model_response:
+                    self.add_to_history("assistant", model_response)
+                    return model_response
+                else:
+                    return f"API响应缺少'response'字段。完整响应: {result}"
+            else:
+                return f"API返回了意外的响应格式: {result}"
+
+        except requests.exceptions.RequestException as e:
+            return f"API请求失败: {str(e)}"
+        except Exception as e:
+            return f"发生未预期的错误: {str(e)}"
+
+    def clear_history(self):
+        """Clear conversation history"""
+        self.conversation_history = []
+
+
+class IntegratedSystem:
+    def __init__(self, index_path='faiss_index.index', texts_path='similar_words_results_20250116_142217.txt',
+                 api_url='http://127.0.0.1:6006'):
+        """
+        初始化集成系统
+        Args:
+            index_path: FAISS索引文件路径
+            texts_path: 规则文本文件路径
+            api_url: DeepSeek API地址
+        """
+        self.query_matcher = QueryMatchingSystem(index_path, texts_path)
+        self.chatbot = ChatBot(api_url)
+
+    def process_user_query(self, query_text, top_k=5):
+        """
+        处理用户查询
+        Args:
+            query_text: 用户输入的查询文本
+            top_k: 返回的最相似规则数量
+        Returns:
+            response: DeepSeek的回答
+        """
+        try:
+            # 1. 使用QueryMatchingSystem检索相关规则
+            prompt, similar_rules, scores = self.query_matcher.process_query(query_text, top_k)
+
+            # 2. 将检索结果作为上下文发送给DeepSeek
+            response = self.chatbot.get_completion(prompt)
+
+            return response
+
+        except Exception as e:
+            return f"处理查询时出错: {str(e)}"
+
+
 def main():
-    # 系统初始化
-    try:
-        system = QueryMatchingSystem()
+    # 初始化集成系统
+    system = IntegratedSystem()
 
-        print("查询系统已启动（输入'quit'退出）")
+    print("集成系统已启动（输入'quit'退出）")
 
-        while True:
+    while True:
+        try:
             # 获取用户输入
             query = input("\n请输入查询内容: ").strip()
 
@@ -125,22 +222,20 @@ def main():
                 print("请输入有效的查询内容")
                 continue
 
-            # 处理查询
-            prompt, rules, scores = system.process_query(query)
+            # 处理查询并获取DeepSeek的回答
+            response = system.process_user_query(query)
 
             # 打印结果
-            print("\n生成的Prompt:")
+            print("\nDeepSeek的回答:")
             print("-" * 50)
-            print(prompt)
+            print(response)
             print("-" * 50)
 
-            # 打印匹配统计
-            print("\n匹配统计:")
-            for rule, score in zip(rules, scores):
-                print(f"相似度: {score:.4f} - {rule[:100]}...")
-
-    except Exception as e:
-        print(f"系统运行出错: {str(e)}")
+        except KeyboardInterrupt:
+            print("\n程序已终止")
+            break
+        except Exception as e:
+            print(f"\n发生错误: {str(e)}")
 
 
 if __name__ == "__main__":
